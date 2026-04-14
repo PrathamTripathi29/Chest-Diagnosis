@@ -11,7 +11,7 @@ import os
 import json
 from datetime import datetime, timedelta
 from supabase import create_client, Client
-
+from contextlib import asynccontextmanager
 from model import load_model, predict, LABELS
 from gradcam import generate_gradcam
 from report import build_report
@@ -24,7 +24,15 @@ SUPABASE_URL       = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY       = os.environ.get("SUPABASE_KEY", "")
 ALLOWED_ORIGINS    = ["http://localhost:5173", "http://localhost:3000"]
 
-app = FastAPI(title="ChestAI API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model
+    print("Loading model...")
+    model = load_model("best_model.pth")
+    print("ChestAI API ready!")
+    yield
+
+app = FastAPI(title="ChestAI API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,14 +45,6 @@ app.add_middleware(
 security = HTTPBearer()
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL else None
 model    = None
-
-
-@app.on_event("startup")
-async def startup_event():
-    global model
-    model = load_model("best_model.pth")
-    print("ChestAI API ready!")
-
 
 class SignupRequest(BaseModel):
     email:    EmailStr
@@ -208,3 +208,7 @@ async def get_history(user_id: str = Depends(get_current_user)):
 @app.get("/health")
 async def health():
     return {"status": "ok", "model_loaded": model is not None, "database": supabase is not None}
+
+@app.get("/")
+async def root():
+    return {"status": "ChestAI API is running", "model_loaded": model is not None}
