@@ -47,6 +47,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "https://chest-diagnosis.vercel.app",
+        "https://chest-diagnosis-2ewu5jz0f-pratham-tripathis-projects.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
