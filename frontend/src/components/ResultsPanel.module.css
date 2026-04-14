@@ -1,0 +1,174 @@
+.wrapper {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a202c;
+}
+
+.scanId {
+  color: #718096;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+.reportBtn {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.reportBtn:hover { opacity: 0.85; }
+
+.chatBtn {
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.chatBtn:hover {
+  background: #667eea;
+  color: white;
+}
+
+.normalResult {
+  text-align: center;
+  padding: 40px;
+  background: #f0fff4;
+  border-radius: 12px;
+  border: 2px solid #9ae6b4;
+}
+
+.normalIcon { font-size: 48px; display: block; margin-bottom: 12px; }
+
+.normalResult h3 {
+  font-size: 20px;
+  color: #276749;
+  margin-bottom: 8px;
+}
+
+.normalResult p { color: #48bb78; }
+
+.normalDisclaimer {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #68d391;
+}
+
+.findings {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.findingCard {
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.findingHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.conditionName {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 6px;
+}
+
+.urgencyBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.confidence {
+  text-align: right;
+}
+
+.confidenceNumber {
+  display: block;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.confidenceLabel {
+  font-size: 12px;
+  color: #718096;
+}
+
+.progressBar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s ease;
+}
+
+.heatmapSection {
+  margin-top: 12px;
+}
+
+.heatmapLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 10px;
+}
+
+.heatmap {
+  width: 100%;
+  max-width: 300px;
+  border-radius: 8px;
+  display: block;
+}
+
+.heatmapCaption {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #a0aec0;
+  font-style: italic;
+}

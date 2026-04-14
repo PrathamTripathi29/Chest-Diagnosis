@@ -1,0 +1,17 @@
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/*.pth
+backend/archive/
+backend/test_*.py
+backend/test_*.jpg
+backend/test_*.png
+backend/test_*.pdf
+backend/evaluate.py
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env

@@ -1,0 +1,41 @@
+.page {
+  min-height: 100vh;
+  background: #f0f4f8;
+}
+
+.main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+.welcome {
+  margin-bottom: 28px;
+}
+
+.welcome h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 6px;
+}
+
+.welcome p {
+  color: #718096;
+  font-size: 15px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.error {
+  background: #fff5f5;
+  border: 2px solid #feb2b2;
+  color: #c53030;
+  padding: 16px 20px;
+  border-radius: 12px;
+  font-size: 15px;
+}
