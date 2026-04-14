@@ -9,9 +9,11 @@ import jwt
 import bcrypt
 import os
 import json
+import asyncio
 from datetime import datetime, timedelta
 from supabase import create_client, Client
 from contextlib import asynccontextmanager
+
 from model import load_model, predict, LABELS
 from gradcam import generate_gradcam
 from report import build_report
@@ -22,14 +24,19 @@ ALGORITHM          = "HS256"
 TOKEN_EXPIRY_HOURS = 24
 SUPABASE_URL       = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY       = os.environ.get("SUPABASE_KEY", "")
-ALLOWED_ORIGINS    = ["http://localhost:5173", "http://localhost:3000"]
+
+model = None
+
+def _load_model_sync():
+    global model
+    print("Loading model in background...")
+    model = load_model("best_model.pth")
+    print("Model ready!")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model
-    print("Loading model...")
-    model = load_model("best_model.pth")
-    print("ChestAI API ready!")
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, _load_model_sync)
     yield
 
 app = FastAPI(title="ChestAI API", version="1.0.0", lifespan=lifespan)
@@ -44,7 +51,7 @@ app.add_middleware(
 
 security = HTTPBearer()
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL else None
-model    = None
+
 
 class SignupRequest(BaseModel):
     email:    EmailStr
@@ -94,6 +101,21 @@ async def get_current_user(
     return decode_token(credentials.credentials)["user_id"]
 
 
+@app.get("/")
+async def root():
+    return {
+        "status":       "ChestAI API is running",
+        "model_loaded": model is not None
+    }
+
+@app.get("/health")
+async def health():
+    return {
+        "status":       "ok",
+        "model_loaded": model is not None,
+        "database":     supabase is not None
+    }
+
 @app.post("/auth/signup", response_model=AuthResponse)
 async def signup(request: SignupRequest):
     if not supabase:
@@ -133,29 +155,40 @@ async def analyze(
     file:    UploadFile = File(...),
     user_id: str = Depends(get_current_user)
 ):
+    if model is None:
+        raise HTTPException(
+            503,
+            "Model is still loading. Please wait 30 seconds and try again."
+        )
     if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
         raise HTTPException(400, "Only JPEG and PNG images accepted")
     if file.size and file.size > 10 * 1024 * 1024:
         raise HTTPException(400, "File too large. Maximum 10MB")
 
-    image_bytes          = await file.read()
-    predictions, _       = predict(model, image_bytes)
-    heatmaps             = generate_gradcam(model, image_bytes, predictions) if predictions else {}
-    pdf_bytes, scan_id   = build_report(predictions, heatmaps)
+    image_bytes        = await file.read()
+    predictions, _     = predict(model, image_bytes)
+    heatmaps           = generate_gradcam(model, image_bytes, predictions) if predictions else {}
+    pdf_bytes, scan_id = build_report(predictions, heatmaps)
 
     image_url = report_url = None
     if supabase:
         image_path  = f"{user_id}/{scan_id}/xray.jpg"
         report_path = f"{user_id}/{scan_id}/report.pdf"
-        supabase.storage.from_("scans").upload(image_path,  image_bytes, {"content-type": "image/jpeg"})
-        supabase.storage.from_("scans").upload(report_path, pdf_bytes,   {"content-type": "application/pdf"})
+        supabase.storage.from_("scans").upload(
+            image_path, image_bytes, {"content-type": "image/jpeg"}
+        )
+        supabase.storage.from_("scans").upload(
+            report_path, pdf_bytes, {"content-type": "application/pdf"}
+        )
         image_url  = supabase.storage.from_("scans").get_public_url(image_path)
         report_url = supabase.storage.from_("scans").get_public_url(report_path)
         supabase.table("scans").insert({
-            "user_id": user_id, "scan_id": scan_id,
+            "user_id":     user_id,
+            "scan_id":     scan_id,
             "predictions": json.dumps(predictions),
-            "image_url": image_url, "report_url": report_url,
-            "created_at": datetime.utcnow().isoformat()
+            "image_url":   image_url,
+            "report_url":  report_url,
+            "created_at":  datetime.utcnow().isoformat()
         }).execute()
 
     return {
@@ -164,21 +197,33 @@ async def analyze(
         "heatmaps":            heatmaps,
         "suggested_questions": get_suggested_questions(predictions),
         "report_url":          report_url,
-        "has_findings":        len([p for p in predictions if p['condition'] != 'No Finding']) > 0
+        "has_findings":        len([
+            p for p in predictions if p['condition'] != 'No Finding'
+        ]) > 0
     }
 
 
 @app.get("/report/{scan_id}")
-async def get_report(scan_id: str, user_id: str = Depends(get_current_user)):
+async def get_report(
+    scan_id: str,
+    user_id: str = Depends(get_current_user)
+):
     if not supabase:
         raise HTTPException(500, "Storage not configured")
-    result = supabase.table("scans").select("*").eq("scan_id", scan_id).eq("user_id", user_id).execute()
+    result = supabase.table("scans").select("*").eq(
+        "scan_id", scan_id
+    ).eq("user_id", user_id).execute()
     if not result.data:
         raise HTTPException(404, "Report not found")
-    pdf_bytes = supabase.storage.from_("scans").download(f"{user_id}/{scan_id}/report.pdf")
+    pdf_bytes = supabase.storage.from_("scans").download(
+        f"{user_id}/{scan_id}/report.pdf"
+    )
     return Response(
-        content=pdf_bytes, media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=ChestAI_{scan_id}.pdf"}
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=ChestAI_{scan_id}.pdf"
+        }
     )
 
 
@@ -188,9 +233,14 @@ async def chat_endpoint(
     user_id: str = Depends(get_current_user)
 ):
     response_text, updated_history = chat(
-        request.message, request.conversation_history, request.report_data
+        request.message,
+        request.conversation_history,
+        request.report_data
     )
-    return {"response": response_text, "conversation_history": updated_history}
+    return {
+        "response":             response_text,
+        "conversation_history": updated_history
+    }
 
 
 @app.get("/history")
@@ -201,14 +251,6 @@ async def get_history(user_id: str = Depends(get_current_user)):
         "scan_id, predictions, image_url, report_url, created_at"
     ).eq("user_id", user_id).order("created_at", desc=True).execute()
     return {"scans": [{
-        **row, "predictions": json.loads(row["predictions"])
+        **row,
+        "predictions": json.loads(row["predictions"])
     } for row in result.data]}
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok", "model_loaded": model is not None, "database": supabase is not None}
-
-@app.get("/")
-async def root():
-    return {"status": "ChestAI API is running", "model_loaded": model is not None}

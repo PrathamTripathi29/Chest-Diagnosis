@@ -6,7 +6,6 @@ torchvision
 pillow
 numpy
 opencv-python-headless
-anthropic
 supabase
 reportlab
 python-jose
@@ -14,6 +13,5 @@ bcrypt
 pyjwt
 python-dotenv
 pydantic[email]
-gdown
 google-genai
 scikit-learn
