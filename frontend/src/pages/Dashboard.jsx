@@ -5,6 +5,7 @@ import Navbar      from '../components/Navbar'
 import UploadZone  from '../components/UploadZone'
 import ResultsPanel from '../components/ResultsPanel'
 import Chatbot     from '../components/Chatbot'
+import ScanHistory from '../components/ScanHistory'
 import styles      from './Dashboard.module.css'
 
 export default function Dashboard() {
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [results,   setResults]   = useState(null)
   const [error,     setError]     = useState('')
   const [chatOpen,  setChatOpen]  = useState(false)
+  const [historyKey, setHistoryKey] = useState(0)
 
   const handleUpload = async (file) => {
     setLoading(true)
@@ -22,6 +24,7 @@ export default function Dashboard() {
     try {
       const res = await analyzeXray(file)
       setResults(res.data)
+      setHistoryKey(prev => prev + 1)
     } catch (err) {
       setError(
         err.response?.data?.detail ||
@@ -79,6 +82,9 @@ export default function Dashboard() {
               onOpenChat={() => setChatOpen(true)}
             />
           )}
+
+          <ScanHistory key={historyKey} />
+
         </div>
       </main>
 

@@ -1,4 +1,3 @@
-#report.py
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -7,7 +6,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer,
     Image as RLImage, Table, TableStyle, HRFlowable
 )
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 import io
 import base64
 from datetime import datetime
@@ -20,7 +19,7 @@ CONDITION_INFO = {
             'the layers of tissue that line the lungs and chest cavity. '
             'This fluid can compress the lung and make breathing difficult.'
         ),
-        'urgency': 'HIGH',
+        'urgency':      'HIGH',
         'urgency_text': 'Please consult a physician within 24 hours.',
         'symptoms': [
             'Shortness of breath',
@@ -41,7 +40,7 @@ CONDITION_INFO = {
             'collects in the air sacs of the lungs, making it difficult '
             'to breathe. It is often caused by heart problems.'
         ),
-        'urgency': 'HIGH',
+        'urgency':      'HIGH',
         'urgency_text': 'Please consult a physician within 24 hours.',
         'symptoms': [
             'Difficulty breathing, especially when lying down',
@@ -62,7 +61,7 @@ CONDITION_INFO = {
             'It is not a disease itself but a sign of another condition '
             'such as heart disease, high blood pressure, or heart valve problems.'
         ),
-        'urgency': 'MEDIUM',
+        'urgency':      'MEDIUM',
         'urgency_text': 'Please consult a physician within 1 week.',
         'symptoms': [
             'Shortness of breath',
@@ -77,14 +76,34 @@ CONDITION_INFO = {
             'Surgery in severe cases'
         ]
     },
+    'Pneumonia': {
+        'description': (
+            'Pneumonia is an infection that inflames the air sacs in one '
+            'or both lungs, which may fill with fluid or pus.'
+        ),
+        'urgency':      'HIGH',
+        'urgency_text': 'Please consult a physician within 24 hours.',
+        'symptoms': [
+            'Fever and chills',
+            'Cough with phlegm',
+            'Shortness of breath',
+            'Chest pain when breathing'
+        ],
+        'treatments': [
+            'Antibiotics (bacterial pneumonia)',
+            'Antiviral medications (viral pneumonia)',
+            'Rest and increased fluid intake',
+            'Hospitalization if severe'
+        ]
+    },
     'No Finding': {
         'description': (
             'No significant abnormalities were detected in this chest X-ray. '
             'The lungs, heart, and visible structures appear within normal limits.'
         ),
-        'urgency': 'LOW',
+        'urgency':      'LOW',
         'urgency_text': 'No immediate action required. Continue routine checkups.',
-        'symptoms': [],
+        'symptoms':     [],
         'treatments': [
             'Continue routine medical checkups',
             'Maintain a healthy lifestyle'
@@ -119,10 +138,16 @@ def get_styles():
         name='ConditionTitle', fontSize=12, fontName='Helvetica-Bold',
         textColor=COLORS['text'], spaceBefore=10, spaceAfter=4
     ))
-    styles['BodyText'].fontSize = 10
-    styles['BodyText'].fontName = 'Helvetica'
+    styles.add(ParagraphStyle(
+        name='GeneratedReportText', fontSize=10, fontName='Helvetica',
+        textColor=COLORS['text'], leading=18, alignment=TA_JUSTIFY,
+        leftIndent=12, rightIndent=12, spaceAfter=6,
+        borderPad=10
+    ))
+    styles['BodyText'].fontSize  = 10
+    styles['BodyText'].fontName  = 'Helvetica'
     styles['BodyText'].textColor = COLORS['text']
-    styles['BodyText'].leading = 16
+    styles['BodyText'].leading   = 16
     styles['BodyText'].alignment = TA_JUSTIFY
     styles['BodyText'].spaceAfter = 6
     styles.add(ParagraphStyle(
@@ -133,29 +158,32 @@ def get_styles():
         name='Disclaimer', fontSize=9, fontName='Helvetica-Oblique',
         textColor=COLORS['subtext'], alignment=TA_JUSTIFY, leading=14
     ))
+    styles.add(ParagraphStyle(
+        name='SmallNote', fontSize=9, fontName='Helvetica-Oblique',
+        textColor=COLORS['subtext'], spaceAfter=8
+    ))
     return styles
 
 
 def urgency_color(urgency: str):
-    mapping = {
+    return {
         'HIGH':   COLORS['high'],
         'MEDIUM': COLORS['medium'],
         'LOW':    COLORS['low']
-    }
-    return mapping.get(urgency, COLORS['subtext'])
+    }.get(urgency, COLORS['subtext'])
 
 
 def decode_heatmap_image(b64_string: str, width=3*inch, height=3*inch):
-    image_bytes   = base64.b64decode(b64_string)
-    image_buffer  = io.BytesIO(image_bytes)
-    return RLImage(image_buffer, width=width, height=height)
+    return RLImage(
+        io.BytesIO(base64.b64decode(b64_string)),
+        width=width, height=height
+    )
 
 
 def confidence_bar_table(confidence: float, urgency: str, styles):
     bar_color = urgency_color(urgency)
     filled    = int(confidence / 5)
-    empty     = 20 - filled
-    bar_text  = '█' * filled + '░' * empty
+    bar_text  = '█' * filled + '░' * (20 - filled)
     data = [[
         Paragraph(
             f'<font color="#{bar_color.hexval()[2:]}"><b>{bar_text}</b></font>',
@@ -163,28 +191,28 @@ def confidence_bar_table(confidence: float, urgency: str, styles):
         ),
         Paragraph(f'<b>{confidence}%</b>', styles['BodyText'])
     ]]
-    table = Table(data, colWidths=[4*inch, 1*inch])
-    table.setStyle(TableStyle([
+    t = Table(data, colWidths=[4*inch, 1*inch])
+    t.setStyle(TableStyle([
         ('ALIGN',  (0,0), (-1,-1), 'LEFT'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
-    return table
+    return t
 
 
-def build_report(predictions, heatmaps, scan_id=None):
+def build_report(predictions, heatmaps, scan_id=None, generated_report=None):
     if scan_id is None:
         scan_id = str(uuid.uuid4())[:8].upper()
 
-    buffer = io.BytesIO()
-    styles = get_styles()
-    doc    = SimpleDocTemplate(
+    buffer   = io.BytesIO()
+    styles   = get_styles()
+    doc      = SimpleDocTemplate(
         buffer, pagesize=A4,
         rightMargin=1.5*cm, leftMargin=1.5*cm,
         topMargin=2*cm,     bottomMargin=2*cm
     )
     elements = []
 
-    # Header
+    # ── Header ────────────────────────────────────────────
     elements.append(Paragraph("ChestAI Analysis Report", styles['ReportTitle']))
     elements.append(Paragraph(
         f"Scan ID: <b>#{scan_id}</b> &nbsp;&nbsp; Date: <b>{datetime.now().strftime('%B %d, %Y')}</b>",
@@ -195,8 +223,34 @@ def build_report(predictions, heatmaps, scan_id=None):
     elements.append(HRFlowable(width="100%", thickness=1, color=COLORS['border']))
     elements.append(Spacer(1, 0.2*inch))
 
-    # Findings Summary
-    elements.append(Paragraph("Findings Summary", styles['SectionHeader']))
+    # ── AI Radiology Report ───────────────────────────────
+    # This section comes FIRST — it's the most radiologist-like text
+    # Generated by BLIP model trained on real MIMIC-CXR reports
+    if generated_report:
+        elements.append(Paragraph("AI Radiology Report", styles['SectionHeader']))
+        elements.append(Paragraph(
+            "Generated by a deep learning model trained on real radiologist "
+            "reports from the MIMIC-CXR dataset (227,835 chest X-rays):",
+            styles['SmallNote']
+        ))
+        # Light blue background box for the generated report
+        report_data = [[
+            Paragraph(generated_report, styles['GeneratedReportText'])
+        ]]
+        report_table = Table(report_data, colWidths=[6.5*inch])
+        report_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#EBF4FF')),
+            ('ROUNDEDCORNERS', [8]),
+            ('BOX',        (0,0), (-1,-1), 0.5, COLORS['primary']),
+            ('PADDING',    (0,0), (-1,-1), 12),
+        ]))
+        elements.append(report_table)
+        elements.append(Spacer(1, 0.3*inch))
+        elements.append(HRFlowable(width="100%", thickness=1, color=COLORS['border']))
+        elements.append(Spacer(1, 0.2*inch))
+
+    # ── Findings Summary Table ────────────────────────────
+    elements.append(Paragraph("AI Classification Results", styles['SectionHeader']))
     if not predictions:
         elements.append(Paragraph(
             "No significant findings detected. The chest X-ray appears within normal limits.",
@@ -237,9 +291,10 @@ def build_report(predictions, heatmaps, scan_id=None):
     elements.append(Spacer(1, 0.3*inch))
     elements.append(HRFlowable(width="100%", thickness=1, color=COLORS['border']))
 
-    # Detailed Findings
+    # ── Detailed Findings ─────────────────────────────────
     elements.append(Spacer(1, 0.2*inch))
     elements.append(Paragraph("Detailed Findings", styles['SectionHeader']))
+
     for pred in predictions:
         condition = pred['condition']
         info      = CONDITION_INFO.get(condition, {})
@@ -268,7 +323,8 @@ def build_report(predictions, heatmaps, scan_id=None):
         elements.append(Paragraph("What is this?", styles['ConditionTitle']))
         elements.append(Paragraph(info.get('description', ''), styles['BodyText']))
         elements.append(Paragraph(
-            f'<font color="#{urg_color.hexval()[2:]}"><b>Recommended Action:</b></font> {info.get("urgency_text", "")}',
+            f'<font color="#{urg_color.hexval()[2:]}"><b>Recommended Action:</b></font> '
+            f'{info.get("urgency_text", "")}',
             styles['BodyText']
         ))
 
@@ -285,7 +341,7 @@ def build_report(predictions, heatmaps, scan_id=None):
         elements.append(Spacer(1, 0.2*inch))
         elements.append(HRFlowable(width="100%", thickness=0.5, color=COLORS['border']))
 
-    # Disclaimer
+    # ── Disclaimer ────────────────────────────────────────
     elements.append(Spacer(1, 0.3*inch))
     elements.append(Paragraph("Important Disclaimer", styles['SectionHeader']))
     elements.append(Paragraph(
